@@ -48,7 +48,7 @@ python xju_md2docx.py thesis.md thesis.docx
 python xju_md2docx.py thesis.md
 ```
 
-离线安全模式：
+如果你明确想关闭公式转换：
 
 ```bash
 python xju_md2docx.py thesis.md thesis.docx --no-formula-conversion
@@ -82,10 +82,12 @@ python xju_md2docx.py thesis.md thesis.docx --no-formula-conversion
 ```bash
 cd xju_md2docx/world-math
 npm install
-cd ../../..
+cd ../..
 ```
 
-如果本地没有 `npm`，脚本也能继续导出，只是公式会退化成普通 LaTeX 文本。
+默认情况下，脚本会优先尝试把 LaTeX 公式转换成 Word 原生公式。
+
+如果本地没有 `npm` / `node`，或者依赖尚未安装成功，脚本不会自动联网安装依赖，而是会继续导出、明确打印警告，并把未转换成功的公式保留为 LaTeX 文本。
 
 ## 写作约定与工作流
 

@@ -7,6 +7,7 @@ import html
 import json
 import re
 import subprocess
+import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -177,6 +178,37 @@ def text_runs(text: str, run_kwargs: dict[str, object] | None = None, preserve_b
     return [run_text_xml(text, **run_kwargs)]
 
 
+def split_inline_code(text: str) -> list[tuple[str, str]]:
+    parts: list[tuple[str, str]] = []
+    i = 0
+    last = 0
+    while i < len(text):
+        if text[i] != "`":
+            i += 1
+            continue
+
+        tick_count = 1
+        while i + tick_count < len(text) and text[i + tick_count] == "`":
+            tick_count += 1
+
+        marker = "`" * tick_count
+        closing = text.find(marker, i + tick_count)
+        if closing == -1:
+            i += tick_count
+            continue
+
+        if i > last:
+            parts.append(("text", text[last:i]))
+        parts.append(("code", text[i + tick_count : closing]))
+        i = closing + tick_count
+        last = i
+
+    if last < len(text):
+        parts.append(("text", text[last:]))
+
+    return parts if parts else [("text", text)]
+
+
 def split_inline_math(text: str) -> list[tuple[str, str]]:
     parts: list[tuple[str, str]] = []
     last = 0
@@ -192,6 +224,16 @@ def split_inline_math(text: str) -> list[tuple[str, str]]:
     if last < len(text):
         parts.append(("text", text[last:]))
     return [(kind, value.replace(r"\$", "$")) for kind, value in parts if value]
+
+
+def inline_code_run_xml(text: str, *, size: int | None = None) -> str:
+    return run_text_xml(
+        text,
+        font_ascii="Courier New",
+        font_hansi="Courier New",
+        font_eastasia="等线",
+        size=size,
+    )
 
 
 def reference_bookmark_name(ref_id: str) -> str:
@@ -269,10 +311,20 @@ def paragraph_with_inline_math_xml(
     math_converter: "MathConverter | None" = None,
     reference_anchors: dict[str, str] | None = None,
 ) -> str:
-    segments = split_inline_math(text)
-    has_math = any(kind == "math" for kind, _ in segments)
-    has_citation = bool(reference_anchors) and bool(INLINE_CITATION_PATTERN.search(text))
-    if not has_math and not has_citation:
+    code_segments = split_inline_code(text)
+    has_code = any(kind == "code" for kind, _ in code_segments)
+    has_math = any(
+        kind == "math"
+        for segment_kind, segment_text in code_segments
+        if segment_kind == "text"
+        for kind, _ in split_inline_math(segment_text)
+    )
+    has_citation = any(
+        bool(reference_anchors) and bool(INLINE_CITATION_PATTERN.search(segment_text))
+        for segment_kind, segment_text in code_segments
+        if segment_kind == "text"
+    )
+    if not has_code and not has_math and not has_citation:
         return formatted_paragraph_xml(
             text,
             style=style,
@@ -285,15 +337,20 @@ def paragraph_with_inline_math_xml(
 
     run_kwargs = run_kwargs or {}
     runs: list[str] = []
-    for kind, value in segments:
-        if kind == "text":
-            runs.extend(citation_text_runs(value, run_kwargs=run_kwargs, reference_anchors=reference_anchors))
+    code_size = int(run_kwargs.get("size")) if run_kwargs.get("size") else None
+    for segment_kind, segment_text in code_segments:
+        if segment_kind == "code":
+            runs.append(inline_code_run_xml(segment_text, size=code_size))
             continue
-        omml = math_converter.get(value, display_mode=False) if math_converter else None
-        if omml:
-            runs.append(omml)
-        else:
-            runs.append(run_text_xml(f"${value}$", **run_kwargs))
+        for kind, value in split_inline_math(segment_text):
+            if kind == "text":
+                runs.extend(citation_text_runs(value, run_kwargs=run_kwargs, reference_anchors=reference_anchors))
+                continue
+            omml = math_converter.get(value, display_mode=False) if math_converter else None
+            if omml:
+                runs.append(omml)
+            else:
+                runs.append(run_text_xml(f"${value}$", **run_kwargs))
 
     return paragraph_xml(
         style=style,
@@ -362,9 +419,12 @@ def collect_math_items(text: str) -> list[tuple[str, bool]]:
             math_lines = []
             continue
 
-        for kind, value in split_inline_math(line):
-            if kind == "math":
-                remember(value, False)
+        for segment_kind, segment_text in split_inline_code(line):
+            if segment_kind != "text":
+                continue
+            for kind, value in split_inline_math(segment_text):
+                if kind == "math":
+                    remember(value, False)
 
     if in_math and math_lines:
         remember("\n".join(math_lines).strip("\n"), True)
@@ -377,6 +437,20 @@ class MathConverter:
         self.cache: dict[tuple[str, bool], str | None] = {}
         self.ready = False
         self.failed = False
+        self.failed_reason: str | None = None
+        self.fallback_items: set[tuple[str, bool]] = set()
+        self.item_errors: list[str] = []
+        self.warning_reported = False
+
+    def _remember_failure(self, reason: str) -> None:
+        self.failed = True
+        if self.failed_reason is None:
+            self.failed_reason = reason
+
+    def _remember_item_error(self, message: str) -> None:
+        cleaned = message.strip()
+        if cleaned and cleaned not in self.item_errors and len(self.item_errors) < 3:
+            self.item_errors.append(cleaned)
 
     def ensure_ready(self) -> bool:
         if self.failed:
@@ -384,20 +458,13 @@ class MathConverter:
         if self.ready:
             return True
         if not WORD_MATH_SCRIPT.exists():
-            self.failed = True
+            self._remember_failure(f"missing converter script: {WORD_MATH_SCRIPT}")
             return False
         if not WORD_MATH_MODULE.exists():
-            try:
-                subprocess.run(
-                    ["npm", "install", "--no-package-lock"],
-                    cwd=WORD_MATH_DIR,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-            except (FileNotFoundError, subprocess.CalledProcessError):
-                self.failed = True
-                return False
+            self._remember_failure(
+                "formula converter dependencies are not installed"
+            )
+            return False
         self.ready = True
         return True
 
@@ -412,6 +479,7 @@ class MathConverter:
         if not self.ensure_ready():
             for key in pending:
                 self.cache[key] = None
+                self.fallback_items.add(key)
             return
 
         payload = {
@@ -430,16 +498,42 @@ class MathConverter:
                 check=True,
             )
             data = json.loads(result.stdout or "{}")
-        except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+        except FileNotFoundError:
+            self._remember_failure("node is not available, so formulas cannot be converted into Word equations")
             for key in pending:
                 self.cache[key] = None
+                self.fallback_items.add(key)
+            return
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or "").strip().splitlines()
+            reason = "the formula converter failed while invoking node"
+            if detail:
+                reason += f": {detail[0]}"
+            self._remember_failure(reason)
+            for key in pending:
+                self.cache[key] = None
+                self.fallback_items.add(key)
+            return
+        except json.JSONDecodeError:
+            self._remember_failure("the formula converter returned invalid output")
+            for key in pending:
+                self.cache[key] = None
+                self.fallback_items.add(key)
             return
 
         results = {str(item.get("id")): item for item in data.get("results", []) if isinstance(item, dict)}
         for idx, key in enumerate(pending):
             item = results.get(str(idx), {})
             omml = item.get("omml") if item.get("ok") else None
-            self.cache[key] = self.sanitize_omml(omml) if isinstance(omml, str) else None
+            sanitized = self.sanitize_omml(omml) if isinstance(omml, str) else None
+            self.cache[key] = sanitized
+            if sanitized is None:
+                self.fallback_items.add(key)
+                error_message = item.get("error") if isinstance(item, dict) else None
+                if isinstance(error_message, str):
+                    self._remember_item_error(error_message)
+                elif isinstance(omml, str):
+                    self._remember_item_error("converter returned invalid OMML")
 
     def preload_from_markdown(self, text: str) -> None:
         self.convert_many(collect_math_items(text))
@@ -463,6 +557,38 @@ class MathConverter:
         except ET.ParseError:
             return None
         return sanitized
+
+    def emit_warning(self) -> None:
+        if self.warning_reported:
+            return
+        self.warning_reported = True
+
+        fallback_count = len(self.fallback_items)
+        if fallback_count == 0:
+            return
+
+        if self.failed_reason:
+            install_dir = str(WORD_MATH_DIR.resolve())
+            print(
+                (
+                    "[warning] Word formula conversion is unavailable: "
+                    f"{self.failed_reason}. {fallback_count} formula(s) were kept as raw LaTeX.\n"
+                    "          To enable Word equations, install the helper dependencies with:\n"
+                    f"          cd {install_dir}\n"
+                    "          npm install"
+                ),
+                file=sys.stderr,
+            )
+            return
+
+        detail = f" Example converter error: {self.item_errors[0]}" if self.item_errors else ""
+        print(
+            (
+                f"[warning] {fallback_count} formula(s) could not be converted to Word equations "
+                f"and were kept as raw LaTeX.{detail}"
+            ),
+            file=sys.stderr,
+        )
 
 
 @dataclass
@@ -675,6 +801,13 @@ def figure_row_xml(
     col_width = max(1800, 9000 // col_count)
     max_width_emu = int(FIGURE_ROW_MAX_WIDTH_IN * EMU_PER_INCH)
     max_height_emu = int(FIGURE_ROW_MAX_HEIGHT_IN * EMU_PER_INCH)
+    common_height_emu = max_height_emu
+    for item, _ in items:
+        if item is None or item.width_emu <= 0 or item.height_emu <= 0:
+            continue
+        height_limit_by_width = int(max_width_emu * item.height_emu / item.width_emu)
+        common_height_emu = min(common_height_emu, max(1, height_limit_by_width))
+    common_height_emu = max(1, min(common_height_emu, max_height_emu))
     tbl_pr = (
         "<w:tblPr>"
         '<w:tblW w:w="9000" w:type="dxa"/>'
@@ -694,6 +827,7 @@ def figure_row_xml(
     cells: list[str] = []
     for item, alt_text in items:
         body: list[str] = []
+        tc_pr = f'<w:tcPr><w:tcW w:w="{col_width}" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>'
         if item is None:
             body.append(
                 formatted_paragraph_xml(
@@ -704,12 +838,15 @@ def figure_row_xml(
                 )
             )
         else:
-            width_emu, height_emu = fit_extent_emu(
-                item.width_emu,
-                item.height_emu,
-                max_width_emu=max_width_emu,
-                max_height_emu=max_height_emu,
-            )
+            width_emu = max(1, int(item.width_emu * common_height_emu / item.height_emu))
+            height_emu = common_height_emu
+            if width_emu > max_width_emu:
+                width_emu, height_emu = fit_extent_emu(
+                    item.width_emu,
+                    item.height_emu,
+                    max_width_emu=max_width_emu,
+                    max_height_emu=max_height_emu,
+                )
             body.append(
                 paragraph_xml(
                     align="center",
@@ -727,7 +864,7 @@ def figure_row_xml(
             )
         if alt_text:
             body.append(paragraph_xml(alt_text, align="center", ppr_extra=spacing_xml(after=0)))
-        cells.append(f"<w:tc>{''.join(body)}</w:tc>")
+        cells.append(f"<w:tc>{tc_pr}{''.join(body)}</w:tc>")
 
     return f"<w:tbl>{tbl_pr}{tbl_grid}<w:tr>{''.join(cells)}</w:tr></w:tbl>"
 
@@ -2061,6 +2198,9 @@ def write_docx(
             zf.writestr("word/_rels/document.xml.rels", document_rels_xml(media_manager))
             for image in media_manager.images:
                 zf.writestr(f"word/{image.part_name}", image.source_path.read_bytes())
+
+    if math_converter is not None:
+        math_converter.emit_warning()
 
 
 def main() -> None:

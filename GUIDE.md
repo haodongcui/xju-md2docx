@@ -210,10 +210,12 @@ $$
 ```bash
 cd xju_md2docx/world-math
 npm install
-cd ../../..
+cd ../..
 ```
 
-如果你当前只想稳定离线导出，可直接加：
+默认情况下，脚本会优先尝试把公式转换成 Word 原生公式；如果依赖没装好，不会自动联网安装，而是会打印清晰警告，然后退化为 LaTeX 文本。
+
+如果你当前就是想显式关闭公式转换，可直接加：
 
 ```bash
 python xju_md2docx.py thesis.md thesis.docx --no-formula-conversion
