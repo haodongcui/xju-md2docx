@@ -1,0 +1,9 @@
+{
+  "name": "xju-md2docx-world-math",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local helper for converting LaTeX equations to Word OMML for xju-md2docx.",
+  "dependencies": {
+    "latex-to-omml": "2.1.1"
+  }
+}
