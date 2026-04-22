@@ -1,0 +1,10 @@
+{
+  "name": "xju-thesis-md2docx-world-math",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local helper for converting LaTeX equations to Word OMML for xju-thesis-md2docx.",
+  "dependencies": {
+    "@hungknguyen/mathml2omml": "0.4.6",
+    "temml": "0.13.2"
+  }
+}

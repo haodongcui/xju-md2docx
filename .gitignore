@@ -2,7 +2,7 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 
-xju_md2docx/world-math/node_modules/
+xju_thesis_md2docx/world-math/node_modules/
 example/*.generated.docx
 
 *.bak

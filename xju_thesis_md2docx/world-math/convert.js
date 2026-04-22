@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-const { latexToOMML } = require("latex-to-omml");
+const temml = require("temml");
+const { mml2omml } = require("@hungknguyen/mathml2omml");
 
 async function main() {
   let input = "";
@@ -20,7 +21,8 @@ async function main() {
     const displayMode = Boolean(item?.displayMode);
 
     try {
-      const omml = await latexToOMML(latex, { displayMode });
+      const mathml = temml.renderToString(latex, { displayMode });
+      const omml = mml2omml(mathml);
       results.push({ id, ok: true, omml });
     } catch (error) {
       results.push({

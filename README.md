@@ -1,4 +1,4 @@
-# xju-md2docx
+# xju-thesis-md2docx
 
 新疆大学本科毕业论文（设计）`Markdown -> DOCX` 导出工具。
 
@@ -36,9 +36,9 @@
 推荐直接把 Python 依赖和公式依赖一次装好。
 
 ```bash
-cd xju-md2docx
+cd xju-thesis-md2docx
 pip install -r requirements.txt
-cd xju_md2docx/world-math
+cd xju_thesis_md2docx/world-math
 npm install
 cd ../..
 ```
@@ -53,7 +53,7 @@ cd ../..
 如果你当前只想先试用正文导出，也可以只装 Python 依赖：
 
 ```bash
-cd xju-md2docx
+cd xju-thesis-md2docx
 pip install -r requirements.txt
 ```
 
@@ -64,7 +64,7 @@ pip install -r requirements.txt
 ### 运行示例
 
 ```bash
-cd xju-md2docx
+cd xju-thesis-md2docx
 bash demo.sh
 ```
 
@@ -73,14 +73,14 @@ bash demo.sh
 ### 导出你自己的论文
 
 ```bash
-cd xju-md2docx
-python xju_md2docx.py thesis.md thesis.docx
+cd xju-thesis-md2docx
+python xju_thesis_md2docx.py thesis.md thesis.docx
 ```
 
 如果不写输出文件，默认生成同名 `.docx`：
 
 ```bash
-python xju_md2docx.py thesis.md
+python xju_thesis_md2docx.py thesis.md
 ```
 
 ## 公式模式说明
@@ -96,22 +96,22 @@ python xju_md2docx.py thesis.md
 如果你明确不想启用公式转换：
 
 ```bash
-python xju_md2docx.py thesis.md thesis.docx --no-formula-conversion
+python xju_thesis_md2docx.py thesis.md thesis.docx --no-formula-conversion
 ```
 
 ## 常用命令
 
 ```bash
-python xju_md2docx.py thesis.md thesis.docx --template my-template.docx
-python xju_md2docx.py thesis.md thesis.docx --no-template
-python xju_md2docx.py thesis.md thesis.docx --no-cover-assets
-python xju_md2docx.py thesis.md thesis.docx --no-formula-conversion
+python xju_thesis_md2docx.py thesis.md thesis.docx --template my-template.docx
+python xju_thesis_md2docx.py thesis.md thesis.docx --no-template
+python xju_thesis_md2docx.py thesis.md thesis.docx --no-cover-assets
+python xju_thesis_md2docx.py thesis.md thesis.docx --no-formula-conversion
 ```
 
 默认行为：
 
-- 默认模板：`xju_md2docx/resources/xju-template.docx`
-- 默认封面资源：`xju_md2docx/resources/`
+- 默认模板：`xju_thesis_md2docx/resources/xju-template.docx`
+- 默认封面资源：`xju_thesis_md2docx/resources/`
 - 默认输出：输入文件同名 `.docx`
 
 ## Markdown 主稿怎么写
@@ -301,16 +301,16 @@ $$
 ## 仓库结构
 
 ```text
-xju-md2docx/
+xju-thesis-md2docx/
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── xju_md2docx.py
+├── xju_thesis_md2docx.py
 ├── demo.sh
 ├── example/
 │   ├── thesis-demo.md
 │   └── img/
-└── xju_md2docx/
+└── xju_thesis_md2docx/
     ├── main.py
     ├── resources/
     ├── world-math/
@@ -320,14 +320,14 @@ xju-md2docx/
 说明：
 
 - 根目录主要放入口脚本、说明文档和示例
-- `xju_md2docx/` 是真正可迁移的工具本体
+- `xju_thesis_md2docx/` 是真正可迁移的工具本体
 - `official-materials/` 只是备查，不参与核心运行
 
 ## 模板与附件
 
-- 默认模板：[xju-template.docx](xju_md2docx/resources/xju-template.docx)
+- 默认模板：[xju-template.docx](xju_thesis_md2docx/resources/xju-template.docx)
 - 示例主稿：[thesis-demo.md](example/thesis-demo.md)
-- 备查材料目录：[official-materials](xju_md2docx/official-materials)
+- 备查材料目录：[official-materials](xju_thesis_md2docx/official-materials)
 
 注意：
 

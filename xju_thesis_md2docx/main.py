@@ -45,7 +45,10 @@ FIGURE_ROW_END_PATTERN = re.compile(r"^:::\s*$")
 CAPTION_PATTERN = re.compile(r"^[图表]\s*\d+(?:[-.]\d+)*(?:\([a-zA-Z]\))?\s+")
 WORD_MATH_DIR = TOOL_ROOT / "world-math"
 WORD_MATH_SCRIPT = WORD_MATH_DIR / "convert.js"
-WORD_MATH_MODULE = WORD_MATH_DIR / "node_modules" / "latex-to-omml"
+WORD_MATH_REQUIRED_MODULES = (
+    WORD_MATH_DIR / "node_modules" / "temml",
+    WORD_MATH_DIR / "node_modules" / "@hungknguyen" / "mathml2omml",
+)
 OMML_TEXT_PATTERN = re.compile(r"(<(?:m|w):t\b[^>]*>)(.*?)(</(?:m|w):t>)", re.DOTALL)
 COVER_EMBLEM_NAME = "xju-emblem.jpeg"
 COVER_WORDMARK_NAME = "xju-wordmark.png"
@@ -460,7 +463,8 @@ class MathConverter:
         if not WORD_MATH_SCRIPT.exists():
             self._remember_failure(f"missing converter script: {WORD_MATH_SCRIPT}")
             return False
-        if not WORD_MATH_MODULE.exists():
+        missing_modules = [str(path) for path in WORD_MATH_REQUIRED_MODULES if not path.exists()]
+        if missing_modules:
             self._remember_failure(
                 "formula converter dependencies are not installed"
             )
