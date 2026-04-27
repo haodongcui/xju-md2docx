@@ -3,10 +3,28 @@
 新疆大学本科毕业论文（设计）`Markdown -> DOCX` 导出工具。
 
 这套工具的定位很明确：
-
-- 用 Markdown 长期维护论文主稿
-- 用 `docx` 模板继承学校版式骨架
+- 现在的 Claude Code / Codex / Gemini cli 等 `Agent` 工具自动化写 `Markdown` 格式很溜
+- 用 Markdown 长期维护毕设论文主稿
+- 用 `docx` 模板继承学校版式骨架, 由本工具根据 md 文档生成对应的 `docx` 格式
 - 导出 Word 供导师审阅、格式检查和最终提交
+
+## 效果预览
+
+当前项目的核心链路是：
+
+`Agent 自动化科研与写作 -> Markdown 主稿 -> 导出器 -> 学校模板样式继承 -> DOCX 成稿`
+
+下面四张 demo 图分别展示了示例主稿的编辑视图，以及导出后的 Word 实际版式效果。上排是 Markdown 主稿，下排是 Word 导出结果。
+
+<p align="center">
+  <img src="demo-md-1.png" alt="Markdown 主稿：结构、段落与公式示例" width="49%" />
+  <img src="demo-md-2.png" alt="Markdown 主稿：表格、单图与并排图示例" width="49%" />
+</p>
+
+<p align="center">
+  <img src="demo-word-1.png" alt="Word 导出：封面、声明、摘要与目录效果" width="49%" />
+  <img src="demo-word-2.png" alt="Word 导出：正文、公式、表格与图片效果" width="49%" />
+</p>
 
 ## 已完成功能
 
